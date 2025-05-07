@@ -1,0 +1,78 @@
+# -*- coding: utf-8 -*-
+'''
+Plot detailed screenshots of of 360-degree PPI
+'''
+import os
+cd=os.path.dirname(__file__)
+import warnings
+from scipy.optimize import curve_fit
+from matplotlib import pyplot as plt
+import xarray as xr
+import numpy as np
+import matplotlib.gridspec as gridspec
+import glob
+import matplotlib
+warnings.filterwarnings('ignore')
+plt.close('all')
+matplotlib.rcParams['font.size'] = 16
+
+#%% Inputs
+source=os.path.join(cd,'data/g3p3/roof.lidar.z01.b0/*360.ppi.nc')
+max_inv_cos=3#maximum gemoetric amplification
+
+#location of towers [m]
+x_tower1=-56
+y_tower1=-358
+x_tower2=-10
+y_tower2=-358
+
+#%% Initalization
+files=glob.glob(source)
+
+#%%% Functions
+def cosine_fit(x,ws,wd):
+    return ws*np.cos(np.radians((90-x)-(270-wd)))
+
+#%% Main
+for f in files:
+    data=xr.open_dataset(f)
+
+    rws_qc=data.wind_speed.where(data.qc_wind_speed==0)
+
+    for i in data.scanID:
+        fig=plt.figure(figsize=(14,10))
+        
+        azi_sel=np.tile(data.azimuth.sel(scanID=i).values,(len(data.range),1))
+        rws_sel=rws_qc.sel(scanID=i).values
+        params, covariance = curve_fit(cosine_fit, azi_sel.ravel()[~np.isnan(rws_sel.ravel())], rws_sel.ravel()[~np.isnan(rws_sel.ravel())],bounds=([0,0],[30,359.9]))
+        u_sel=rws_sel/cosine_fit(azi_sel,1,params[1])
+        u_sel[1/np.abs(cosine_fit(azi_sel,1,params[1]))>max_inv_cos]=np.nan
+        cp=plt.pcolor(data.x,data.y,u_sel,vmin=params[0]*0.5,vmax=params[0]*1.5,cmap='coolwarm')
+        ax=plt.gca()
+        plt.xlim([-1000,1000])
+        plt.ylim([-1000,1000])
+        ax.arrow(-np.cos(np.radians(270-params[1]))*50,-np.sin(np.radians(270-params[1]))*50,
+                  np.cos(np.radians(270-params[1]))*50,np.sin(np.radians(270-params[1]))*50,head_width=50, head_length=50, fc='g', ec='k',width=20)
+        plt.plot(0,0,'ok',markersize=7)
+        plt.plot(x_tower1,y_tower1,'sk',markersize=7)
+        plt.plot(x_tower2,y_tower2,'sk',markersize=7)
+        plt.xlabel('W-E [m]')
+        if int(i.values)==0:
+            plt.ylabel('S-N [m]')
+        else:
+            ax.set_yticklabels([])
+        xlim=ax.get_xlim()
+        ylim=ax.get_ylim()
+        ax.set_box_aspect(np.diff(ylim)/np.diff(xlim))
+        plt.grid()
+        time1=str(data.time.sel(scanID=i,beamID=0).values).replace('T',' ')[:19]
+        time2=str(data.time.sel(scanID=i,beamID=len(data.beamID)-1).values).replace('T',' ')[11:19]
+        plt.title(f'{time1} - {time2}')
+    
+        cb=plt.colorbar(cp,label=r'Wind speed [m s${-1}$]')
+        plt.savefig(os.path.join(cd,'figures',os.path.basename(f).replace('nc',f'{int(i.values)}.ueq.png')))
+        plt.close()
+    
+       
+    
+    
