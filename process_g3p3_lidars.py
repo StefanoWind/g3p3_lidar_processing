@@ -28,8 +28,8 @@ warnings.filterwarnings('ignore')
 
 #users inputs
 if len(sys.argv)==1:
-    sdate='2025-05-04' #start date
-    edate='2025-05-05' #end date
+    sdate='2025-05-06' #start date
+    edate='2025-05-07' #end date
     delete=False #delete raw files?
     path_config=os.path.join(cd,'configs/config_g3p3.yaml') #config path
     mode='serial'
@@ -97,7 +97,7 @@ for channel in config['channels']:
         
              
     #standardize all files within date range
-    files=glob.glob(os.path.join(config['path_data'],channel.replace('raw','a0'),'*a0*user5.nc'))
+    files=glob.glob(os.path.join(config['path_data'],channel.replace('raw','a0'),'*a0*.nc'))
     save_path_stand=os.path.join(config['path_data'],channel.replace('raw','b0'))
     if mode=='serial':
         for f in files:
