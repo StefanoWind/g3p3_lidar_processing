@@ -21,6 +21,8 @@ else:
     path_config=sys.argv[1]#config path
     path_out=sys.argv[2]
 
+project='g3p3'
+
 # ordered: longest match first so YYYYMMDD_HHMMSS is tried before YYYYMMDD_HH
 _patterns = [
     (re.compile(r'\d{8}\.\d{6}'), '%Y%m%d.%H%M%S'),
@@ -47,14 +49,14 @@ with open(path_config, 'r') as fid:
 os.makedirs(path_out,exist_ok=True)
     
 subfolders = sorted([
-    d for d in os.listdir(config['path_data'])
-    if os.path.isdir(os.path.join(config['path_data'], d))
+    d for d in os.listdir(os.path.join(config['path_data'],project))
+    if os.path.isdir(os.path.join(config['path_data'],project, d))
 ])
 
 
 times_per_folder = {}
 for sf in subfolders:
-    folder_path = os.path.join(config['path_data'], sf)
+    folder_path = os.path.join(config['path_data'],project, sf)
     files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
     dts = sorted(set(filter(None, (extract_datetime(f) for f in files))))
     times_per_folder[sf] = dts
