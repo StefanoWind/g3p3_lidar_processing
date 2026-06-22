@@ -28,8 +28,8 @@ warnings.filterwarnings('ignore')
 
 #users inputs
 if len(sys.argv)==1:
-    sdate='2025-11-10' #start date
-    edate='2025-11-11' #end date
+    sdate='2025-12-12' #start date
+    edate='2025-12-13' #end date
     delete=False #delete raw files?
     path_config=os.path.join(cd,'configs/config_g3p3.yaml') #config path
     mode='serial'
