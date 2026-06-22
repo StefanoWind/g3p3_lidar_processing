@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import os
-cd = os.path.dirname(__file__)
 import re
 from datetime import datetime
 import matplotlib.pyplot as plt
@@ -12,8 +11,8 @@ mpl.rcParams['font.size'] = 12
 mpl.rcParams['savefig.dpi']=300
 
 #%% Inputs
-data_dir = os.path.join(cd, 'data/g3p3')
-fig_dir  = os.path.join(cd, 'figures')
+data_dir ='data/g3p3'
+fig_dir  = 'figures'
 os.makedirs(fig_dir, exist_ok=True)
 
 # ordered: longest match first so YYYYMMDD_HHMMSS is tried before YYYYMMDD_HH
