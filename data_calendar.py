@@ -1,19 +1,25 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 import re
 from datetime import datetime
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib as mpl
+import yaml
 mpl.rcParams['font.family'] = 'serif'
 mpl.rcParams['mathtext.fontset'] = 'cm'
 mpl.rcParams['font.size'] = 12
 mpl.rcParams['savefig.dpi']=300
 
 #%% Inputs
-data_dir ='data/g3p3'
-fig_dir  = 'figures'
-os.makedirs(fig_dir, exist_ok=True)
+#users inputs
+if len(sys.argv)==1:
+    path_config=os.path.abspath('configs/config_g3p3.yaml') #config path
+    path_out=os.path.abspath('figures') #config path
+else:
+    path_config=sys.argv[1]#config path
+    path_out=sys.argv[2]
 
 # ordered: longest match first so YYYYMMDD_HHMMSS is tried before YYYYMMDD_HH
 _patterns = [
@@ -32,15 +38,23 @@ def extract_datetime(filename):
                 pass
     return None
 
-#%% Collect datetimes per subfolder
+#%% Initialization
+
+#configs
+with open(path_config, 'r') as fid:
+    config = yaml.safe_load(fid)
+    
+os.makedirs(path_out,exist_ok=True)
+    
 subfolders = sorted([
-    d for d in os.listdir(data_dir)
-    if os.path.isdir(os.path.join(data_dir, d))
+    d for d in os.listdir(config['path_data'])
+    if os.path.isdir(os.path.join(config['path_data'], d))
 ])
+
 
 times_per_folder = {}
 for sf in subfolders:
-    folder_path = os.path.join(data_dir, sf)
+    folder_path = os.path.join(config['path_data'], sf)
     files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
     dts = sorted(set(filter(None, (extract_datetime(f) for f in files))))
     times_per_folder[sf] = dts
@@ -64,7 +78,7 @@ ax.grid(axis='x', linestyle='--', alpha=0.4)
 plt.tight_layout()
 
 now_str = datetime.strftime(datetime.now(),'%Y%m%d.%H%M%S')
-out_path = os.path.join(fig_dir, f'{now_str}.data_calendar.png')
+out_path = os.path.join(path_out, f'{now_str}.data_calendar.png')
 fig.savefig(out_path, dpi=150)
 print(f'Saved: {out_path}')
 plt.show()
