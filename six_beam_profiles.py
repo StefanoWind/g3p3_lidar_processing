@@ -24,8 +24,8 @@ warnings.filterwarnings('ignore')
 
 #users inputs
 if len(sys.argv)==1:
-    sdate='2025-03-20' #start date
-    edate='2025-04-02' #end date
+    sdate='2026-08-20' #start date
+    edate='2026-12-31' #end date
     replace=False #replace existing files
     path_config=os.path.join(cd,'configs/config_g3p3.yaml') #config path
     mode='serial' #processing mofe (serial or parallel)
@@ -289,7 +289,7 @@ for channel in config['channels_six_beam']:
     
     files={}
     for d in days:
-        files[d]=glob.glob(os.path.join(config['path_data'],channel,f'*{str(d)[:10].replace("-","")}*six.beam*nc'))
+        files[d]=sorted(glob.glob(os.path.join(config['path_data'],channel,f'*{str(d)[:10].replace("-","")}*six.beam*nc')))
         
     if mode=='serial':
         for d in days:

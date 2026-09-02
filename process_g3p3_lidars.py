@@ -28,8 +28,8 @@ warnings.filterwarnings('ignore')
 
 #users inputs
 if len(sys.argv)==1:
-    sdate='2025-12-12' #start date
-    edate='2025-12-13' #end date
+    sdate='2026-08-12' #start date
+    edate='2026-12-13' #end date
     delete=False #delete raw files?
     path_config=os.path.join(cd,'configs/config_g3p3.yaml') #config path
     mode='serial'
@@ -83,7 +83,7 @@ def standardize_file(file,save_path_stand,config,logfile_main,sdate,edate):
 for channel in config['channels']:
     
     #format all files
-    files=glob.glob(os.path.join(config['path_data'],channel,'*hpl'))
+    files=sorted(glob.glob(os.path.join(config['path_data'],channel,'*hpl')))
     save_path_raw=os.path.join(config['path_data'],channel.replace('raw','00'))
     if mode=='serial':
         for f in files:
@@ -97,7 +97,7 @@ for channel in config['channels']:
         
              
     #standardize all files within date range
-    files=glob.glob(os.path.join(config['path_data'],channel.replace('raw','a0'),'*.nc'))
+    files=sorted(glob.glob(os.path.join(config['path_data'],channel.replace('raw','a0'),'*.nc')))
     save_path_stand=os.path.join(config['path_data'],channel.replace('raw','b0'))
     if mode=='serial':
         for f in files:
