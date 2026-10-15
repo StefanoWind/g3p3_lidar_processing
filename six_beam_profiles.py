@@ -114,71 +114,80 @@ def wind_retrieval(files,config,lidar_height,save_path, replace):
     if os.path.isfile(os.path.join(save_path,filename)) and replace==False:
         logging.info(f'File {filename} already exists, skipping')
         return
-    
+
+    height=np.arange(config['min_height'],config['max_height']+config['height_step'],config['height_step'])
+
     for f in files:
         logging.info(f'Processing {os.path.basename(f)}')
-        data=xr.open_dataset(f)
-        Nb=len(data.beamID)
-        
-        #cartesian angles
-        alpha=(90-data.azimuth.mean(dim='scanID').values)%360
-        beta=data.elevation.mean(dim='scanID').values
-        
-        #time
-        time_avg=data.time.sel(scanID=0,beamID=0)+(data.time.sel(scanID=len(data.scanID)-1,beamID=len(data.beamID)-1)-data.time.sel(scanID=0,beamID=0))/2
-        
-        #average and interpolate RWS
-        z=data.z.values+lidar_height
-        rws_avg=data.wind_speed.where(data.qc_wind_speed==0).mean(dim='scanID').values
-        height=np.arange(config['min_height'],np.nanmax(z)+config['height_step'],config['height_step'])
-        
-        rws_avg_int=np.zeros((len(height),Nb))
-        for i in range(Nb):
-            f_int=interpolate.interp1d(np.concatenate([[0],z[:,i],[height[-1]+1]]), np.concatenate([[np.nan],rws_avg[:,i],[np.nan]]), kind='linear')
-            rws_avg_int[:,i]=f_int(height).T
-    
-        #velocity vector
-        A=[]
-        for a,b in zip(alpha,beta):
-            A=vstack(A,np.array([cosd(b)*cosd(a),cosd(b)*sind(a),sind(b)]))
-        A_inv=general_inv(A)
-            
-        vel_vector=A_inv@rws_avg_int.T
-        
-        #store wind velocity
+        try:
+            data=xr.open_dataset(f)
+            Nb=len(data.beamID)
+
+            #cartesian angles
+            alpha=(90-data.azimuth.mean(dim='scanID').values)%360
+            beta=data.elevation.mean(dim='scanID').values
+
+            #time
+            time_avg=data.time.sel(scanID=0,beamID=0)+(data.time.sel(scanID=len(data.scanID)-1,beamID=len(data.beamID)-1)-data.time.sel(scanID=0,beamID=0))/2
+
+            #average and interpolate RWS
+            z=data.z.values+lidar_height
+            rws_avg=data.wind_speed.where(data.qc_wind_speed==0).mean(dim='scanID').values
+
+            rws_avg_int=np.zeros((len(height),Nb))
+            for i in range(Nb):
+                f_int=interpolate.interp1d(z[:,i], rws_avg[:,i], kind='linear', bounds_error=False, fill_value=np.nan)
+                rws_avg_int[:,i]=f_int(height).T
+
+            #velocity vector
+            A=[]
+            for a,b in zip(alpha,beta):
+                A=vstack(A,np.array([cosd(b)*cosd(a),cosd(b)*sind(a),sind(b)]))
+            A_inv=general_inv(A)
+
+            vel_vector=A_inv@rws_avg_int.T
+
+            #variance
+            rws_var=data.wind_speed.where(data.qc_wind_speed==0).var(dim='scanID').values
+
+            rws_var_int=np.zeros((len(height),Nb))
+            for i in range(Nb):
+                f_int=interpolate.interp1d(z[:,i], rws_var[:,i], kind='linear', bounds_error=False, fill_value=np.nan)
+                rws_var_int[:,i]=f_int(height).T
+
+            #reynolds stresses
+            A=[]
+            for a,b in zip(alpha,beta):
+                A=vstack(A,
+                [cosd(b)**2*cosd(a)**2,
+                 cosd(b)**2*sind(a)**2,
+                 sind(b)**2,
+                 2*cosd(b)**2*cosd(a)*sind(a),
+                 2*cosd(b)*sind(b)*cosd(a),
+                 2*cosd(b)*sind(b)*sind(a)])
+
+            RS=np.matmul(general_inv(A),rws_var_int.T)
+        except Exception as e:
+            logging.error(f'Failed to process {os.path.basename(f)}: {e}')
+            continue
+
+        #store results only after the whole file succeeded so all arrays stay aligned
         U=vstack(U,vel_vector[0,:])
         V=vstack(V,vel_vector[1,:])
         W=vstack(W,vel_vector[2,:])
         time=np.append(time,time_avg)
-        
-        #variance
-        rws_var=data.wind_speed.where(data.qc_wind_speed==0).var(dim='scanID').values
-        
-        rws_var_int=np.zeros((len(height),Nb))
-        for i in range(Nb):
-            f_int=interpolate.interp1d(np.concatenate([[0],z[:,i],[height[-1]+1]]), np.concatenate([[np.nan],rws_var[:,i],[np.nan]]), kind='linear')
-            rws_var_int[:,i]=f_int(height).T
-            
-        #reynolds stresses
-        A=[]
-        for a,b in zip(alpha,beta):
-            A=vstack(A,
-            [cosd(b)**2*cosd(a)**2,
-             cosd(b)**2*sind(a)**2, 
-             sind(b)**2,
-             2*cosd(b)**2*cosd(a)*sind(a),  
-             2*cosd(b)*sind(b)*cosd(a),
-             2*cosd(b)*sind(b)*sind(a)])               
-        
-        RS=np.matmul(general_inv(A),rws_var_int.T)
-            
+
         uu=vstack(uu,RS[0,:])
         vv=vstack(vv,RS[1,:])
         ww=vstack(ww,RS[2,:])
         uv=vstack(uv,RS[3,:])
         uw=vstack(uw,RS[4,:])
         vw=vstack(vw,RS[5,:])
-        
+
+    if len(time)==0:
+        logging.error(f'No valid files for {filename}, skipping')
+        return
+
     #output
     Output=xr.Dataset()
     Output['U']=xr.DataArray(data=U,coords={'time':time,'height':height},
