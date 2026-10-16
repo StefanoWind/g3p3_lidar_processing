@@ -226,6 +226,11 @@ def wind_retrieval(files,config,lidar_height,save_path, replace):
     Output['u_star']=(Output['uw']**2+Output['vw']**2)**0.25
     Output['u_star'].attrs={'units':'m/s','description':'friction velocity'}
     
+    n_dup=int(Output.indexes['time'].duplicated().sum())
+    if n_dup>0:
+        logging.warning(f'Removed {n_dup} duplicate time stamps')
+    Output=Output.sortby('time').drop_duplicates('time')
+
     logging.info(f'Wind profiles saves as {os.path.join(save_path,filename)}')
     Output.to_netcdf(os.path.join(save_path,filename))
     
@@ -234,7 +239,13 @@ def wind_retrieval(files,config,lidar_height,save_path, replace):
     
     return Output
 
-    
+def safe_wind_retrieval(files,config,lidar_height,save_path,replace):
+    try:
+        return wind_retrieval(files,config,lidar_height,save_path,replace)
+    except Exception as e:
+        logging.error(f'Failed to process {files[0] if len(files)>0 else files}: {e}')
+        print(f'Failed to process {files[0] if len(files)>0 else files}: {e}')
+
 def wind_map(data,filename):
     
     barb_stagger_time = 1#skipped time samples in barbs
@@ -303,12 +314,16 @@ for channel in config['channels_six_beam']:
     if mode=='serial':
         for d in days:
             if len(files[d])>1:
-                Output=wind_retrieval(files[d],config,config['lidar_height'][channel],save_path,replace)
+                try:
+                    Output=wind_retrieval(files[d],config,config['lidar_height'][channel],save_path,replace)
+                except Exception as e:
+                    logging.error(f'Failed to process {channel} on {str(d)[:10]}: {e}')
+                    print(f'Failed to process {channel} on {str(d)[:10]}: {e}')
     
     elif mode=='parallel':
         args = [(files[d], config,config['lidar_height'][channel], save_path,replace) for d in days]
         with Pool() as pool:
-            pool.starmap(wind_retrieval, args)
+            pool.starmap(safe_wind_retrieval, args)
     else:
         raise BaseException(f"{mode} is not a valid processing mode (must be serial or parallel)")
      
